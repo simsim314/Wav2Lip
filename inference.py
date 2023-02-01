@@ -13,6 +13,9 @@ parser = argparse.ArgumentParser(description='Inference code to lip-sync videos 
 parser.add_argument('--checkpoint_path', type=str, 
 					help='Name of saved checkpoint to load weights from', required=True)
 
+parser.add_argument('--ffmpeg_dir', type=str, 
+					help='path to directory with ffmpeg', required=True)
+
 parser.add_argument('--face', type=str, 
 					help='Filepath of video/image that contains faces to use', required=True)
 parser.add_argument('--audio', type=str, 
@@ -53,6 +56,9 @@ parser.add_argument('--nosmooth', default=False, action='store_true',
 args = parser.parse_args()
 args.img_size = 96
 
+os.environ["PATH"] = os.environ["PATH"] + ":" + os.path.dirname(args.ffmpeg_dir)
+os.makedirs("temp", exist_ok = True)
+
 if os.path.isfile(args.face) and args.face.split('.')[1] in ['jpg', 'png', 'jpeg']:
 	args.static = True
 
@@ -88,15 +94,16 @@ def face_detect(images):
 	pady1, pady2, padx1, padx2 = args.pads
 	for rect, image in zip(predictions, images):
 		if rect is None:
-			cv2.imwrite('temp/faulty_frame.jpg', image) # check this frame where the face was not detected.
-			raise ValueError('Face not detected! Ensure the video contains a face in all the frames.')
-
-		y1 = max(0, rect[1] - pady1)
-		y2 = min(image.shape[0], rect[3] + pady2)
-		x1 = max(0, rect[0] - padx1)
-		x2 = min(image.shape[1], rect[2] + padx2)
-		
-		results.append([x1, y1, x2, y2])
+			# cv2.imwrite('temp/faulty_frame.jpg', image) # check this frame where the face was not detected.
+			# raise ValueError('Face not detected! Ensure the video contains a face in all the frames.')
+			results.append(results[len(results) - 1])
+		else:
+			y1 = max(0, rect[1] - pady1)
+			y2 = min(image.shape[0], rect[3] + pady2)
+			x1 = max(0, rect[0] - padx1)
+			x2 = min(image.shape[1], rect[2] + padx2)
+			
+			results.append([x1, y1, x2, y2])
 
 	boxes = np.array(results)
 	if not args.nosmooth: boxes = get_smoothened_boxes(boxes, T=5)
